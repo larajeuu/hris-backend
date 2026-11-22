@@ -1,13 +1,13 @@
 # Use this workspace to collaborate
-workspace:
+# workspace:
   id: 3f36622e-33ee-4ed9-8225-551af0c73a35
 
 # Each entry here maps a local resource to one or more corresponding objects in Postman Cloud
-cloudResources:
-  collections:
-    ../postman/collections/HRIS API - Pemmob: 55582943-8221009e-9da7-42ac-9907-f133fa12d678
-    ../postman/collections/APSI API - EU: 55582943-3dfa94c0-aea9-4510-a24c-174180edc4ba
-    ../postman/collections/My Collection: 55582943-13d194c6-f961-42b3-9b66-1b4e747900b4
+# cloudResources:
+  # collections:
+    # ../postman/collections/HRIS API - Pemmob: 55582943-8221009e-9da7-42ac-9907-f133fa12d678
+    # ../postman/collections/APSI API - EU: 55582943-3dfa94c0-aea9-4510-a24c-174180edc4ba
+    # ../postman/collections/My Collection: 55582943-13d194c6-f961-42b3-9b66-1b4e747900b4
 
 # All resources in the `postman/` folder are automatically registered in Local View.
 # Point to additional files outside the `postman/` folder to register them individually. Example:
