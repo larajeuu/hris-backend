@@ -1,0 +1,13 @@
+$kind: http-request
+url: "{{hostname}}/user-notifications/1/read"
+method: POST
+body:
+  type: json
+  content: |-
+    {
+          "ids": [
+                0
+          ]
+    }
+settings: {}
+order: 2000

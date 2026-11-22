@@ -1,0 +1,15 @@
+$kind: http-request
+url: "{{hostname}}/reviews"
+method: POST
+body:
+  type: json
+  content: |-
+    {
+      "merchant_id": 1,
+      "customer_id": 2,
+      "pelanggan": "Nes",
+      "rating": 5,
+      "komentar": "Pedas nampol, joss"
+    }
+settings: {}
+order: 2000

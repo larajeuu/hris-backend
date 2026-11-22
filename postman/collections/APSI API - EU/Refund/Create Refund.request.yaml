@@ -1,0 +1,16 @@
+$kind: http-request
+url: "{{hostname}}/refunds"
+method: POST
+body:
+  type: json
+  content: |-
+    {
+      "id_pesanan": 1,
+      "nominal": 58000,
+      "metode_refund": "Transfer BCA",
+      "nomor_tujuan": "1234567890"
+    }
+auth:
+  type: noauth
+settings: {}
+order: 3000

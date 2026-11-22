@@ -1,0 +1,16 @@
+$kind: http-request
+url: "{{hostname}}/attachments/6"
+method: DELETE
+body:
+  type: formdata
+  content:
+    - type: file
+      key: file
+      src: /home/ubuntu/Pictures/Wallpapers/Song-Kang-For-ELLE-Korea-Magazine-February-Issue-Behind-the-Scene-Part1-cover.jpg
+      disabled: true
+auth:
+  type: bearer
+  credentials:
+    token: "{{supabase_service_role_api_key_0qvj}}"
+settings: {}
+order: 5000

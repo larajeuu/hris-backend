@@ -1,0 +1,22 @@
+$kind: http-request
+url: "{{hostname}}/auth/register"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+        "nama": "Nanap Mantap",
+        "identifier": "nanap@gmail.com",
+        "password": "password123",
+        "owner": "Nanap",
+        "alamat": "Blok A-001",
+        "block": "A-001",
+        "category": "Makanan",
+        "deskripsi": "Warung masakan Nanap"
+    }
+auth:
+  type: noauth
+settings: {}
+order: 3000

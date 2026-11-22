@@ -1,0 +1,12 @@
+$kind: http-request
+url: "{{hostname}}/payment-methods/2"
+method: DELETE
+body:
+  type: json
+  content: '{ "nama_metode": "GoPay" }'
+auth:
+  type: bearer
+  credentials:
+    token: "{{supabase_service_role_api_key_0lzi}}"
+settings: {}
+order: 3000

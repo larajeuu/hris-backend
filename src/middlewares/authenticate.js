@@ -1,36 +1,54 @@
+
 const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
+const jwtConfig = require('../config/jwt');
 const HttpError = require('../utils/httpError');
 
 async function authenticate(req, res, next) {
   try {
-    // Format header: Authorization: Bearer <token>
-    const [scheme, token] = (req.headers.authorization || '').split(' ');
+    const authorization = req.headers.authorization || '';
+    const [scheme, token] = authorization.split(' ');
+
     if (scheme !== 'Bearer' || !token) {
       throw new HttpError(401, 'Token tidak ditemukan');
     }
 
     let payload;
+
     try {
-      payload = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
-    } catch {
+      payload = jwt.verify(token, jwtConfig.publicKey, {
+        algorithms: ['RS256'],
+      });
+    } catch (error) {
+      console.error('JWT verify error:', error.name, '-', error.message);
       throw new HttpError(401, 'Token tidak valid atau sudah kedaluwarsa');
     }
 
-    // Cek ke database: akun masih ada dan aktif, role selalu yang terbaru
     const result = await pool.query(
-      'SELECT id, name, email, role, is_active FROM users WHERE id = $1',
+      `SELECT id, name, email, role, is_active
+       FROM users
+       WHERE id = $1`,
       [payload.sub]
     );
+
     const user = result.rows[0];
+
     if (!user || !user.is_active) {
       throw new HttpError(401, 'Akun tidak ditemukan atau tidak aktif');
     }
 
-    req.user = { id: user.id, name: user.name, email: user.email, role: user.role };
+    req.user = {
+      id: user.id,
+      employee_id: payload.emp,
+      roles: payload.roles || [],
+      device_id: payload.did,
+      name: user.name,
+      email: user.email,
+    };
+
     next();
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    next(error);
   }
 }
 

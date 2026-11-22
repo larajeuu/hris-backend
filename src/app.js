@@ -6,8 +6,8 @@ const errorHandler = require('./middlewares/errorHandler');
 const app = express();
 
 app.use(express.json());
-app.use('/api/v1', routes); // versi API di URL
+app.use('/v1', routes);
 app.use(notFound);
-app.use(errorHandler); // harus paling terakhir
+app.use(errorHandler);
 
 module.exports = app;

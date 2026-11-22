@@ -1,0 +1,8 @@
+$kind: collection
+auth:
+  - id: 02c7103a-bdf6-4439-97e8-f98bd30139b2
+    type: bearer
+    name: bearer auth
+    credentials:
+      token: "{{supabase_service_role_api_key_18bt}}"
+order: 15000

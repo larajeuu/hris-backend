@@ -1,0 +1,11 @@
+$kind: http-request
+url: "{{hostname}}/merchant-orders/notifications/1/read-all"
+method: POST
+body:
+  type: json
+  content: |-
+    {
+          "updated": 2
+    }
+settings: {}
+order: 6000

@@ -1,0 +1,25 @@
+$kind: http-request
+url: "{{hostname}}/customer-orders"
+method: POST
+headers:
+  Authorization: "Content-Type: application/json"
+body:
+  type: json
+  content: |-
+    {
+          "customer": {
+                "nama": "Nano",
+                "email": "nano@mail.com",
+                "phone": "0811-1344"
+          },
+          "tipe_order": "takeaway",
+          "metode_pembayaran_id": 1,
+          "items": [
+                {
+                      "product_id": 1,
+                      "jumlah": 10
+                }
+          ]
+    }
+settings: {}
+order: 3000

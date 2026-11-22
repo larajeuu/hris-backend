@@ -1,0 +1,18 @@
+$kind: http-request
+url: "{{hostname}}/admin/merchants"
+method: GET
+headers:
+  Authorization: "Content-Type: application/json"
+queryParams:
+  - key: status
+    value: suspended
+    disabled: true
+body:
+  type: json
+  content: ""
+auth:
+  type: bearer
+  credentials:
+    token: "{{supabase_service_role_api_key_0lzi}}"
+settings: {}
+order: 2000

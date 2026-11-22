@@ -1,0 +1,10 @@
+$kind: http-request
+url: "{{hostname}}/customer-orders/1/confirm"
+method: POST
+headers:
+  Authorization: "Content-Type: application/json"
+body:
+  type: json
+  content: ""
+settings: {}
+order: 5000

@@ -1,0 +1,18 @@
+$kind: http-request
+url: "{{hostname}}/withdrawals"
+method: POST
+body:
+  type: json
+  content: |-
+    {
+          "amount": 20000.0,
+          "bank": "BCA",
+          "account_number": "1234567890",
+          "account_name": "Rina Wati"
+    }
+auth:
+  type: bearer
+  credentials:
+    token: "{{supabase_service_role_api_key_13nt}}"
+settings: {}
+order: 3000

@@ -1,4 +1,4 @@
-require('dotenv').config(); // harus paling atas, sebelum modul yang membaca process.env
+require('dotenv').config();
 const app = require('./app');
 
 const PORT = process.env.PORT || 3000;

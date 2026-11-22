@@ -1,0 +1,16 @@
+$kind: http-request
+url: "{{hostname}}/merchants"
+method: GET
+headers:
+  Authorization: "Content-Type: application/json"
+body:
+  type: json
+  content: |-
+    {
+      "email": "admin@gmail.com",
+      "password": "123456"
+    }
+auth:
+  type: noauth
+settings: {}
+order: 1000

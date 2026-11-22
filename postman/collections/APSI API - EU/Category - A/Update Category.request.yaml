@@ -1,0 +1,17 @@
+$kind: http-request
+url: "{{hostname}}/categories/1"
+method: PUT
+headers:
+  Authorization: "Content-Type: application/json"
+body:
+  type: json
+  content: |-
+    {
+          "nama_kategori": "Makanan Ringan"
+    }
+auth:
+  type: bearer
+  credentials:
+    token: "{{supabase_service_role_api_key_0lm7}}"
+settings: {}
+order: 3000

@@ -1,0 +1,14 @@
+$kind: http-request
+url: "{{hostname}}/auth/login"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+        "identifier": "rinaseblak@gmail.com",
+        "password": "password123"
+    }
+settings: {}
+order: 2000

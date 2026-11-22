@@ -1,0 +1,14 @@
+$kind: http-request
+url: "{{hostname}}/payments"
+method: POST
+body:
+  type: json
+  content: |-
+    {
+          "id_pesanan": 2,
+          "metode_pembayaran": "Transfer",
+          "nominal": 58000,
+          "qrcode_kode_url": "https://qr.example.com/pay/123"
+    }
+settings: {}
+order: 3000

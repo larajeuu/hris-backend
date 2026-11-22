@@ -1,0 +1,7 @@
+$kind: http-request
+url: "{{hostname}}/payments/2"
+method: GET
+auth:
+  type: noauth
+settings: {}
+order: 2000

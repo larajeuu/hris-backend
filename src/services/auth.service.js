@@ -1,7 +1,9 @@
+const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
 const HttpError = require('../utils/httpError');
+const { privateKey } = require('../config/jwt');
 
 async function login(email, password) {
   const result = await pool.query(
@@ -26,8 +28,8 @@ async function login(email, password) {
   // Isi token: id (sub) dan role saja. Tanpa password, tanpa data pribadi.
   const token = jwt.sign(
     { sub: user.id, role: user.role },
-    process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN || '1d' }
+    privateKey,
+    { algorithm: 'RS256', expiresIn: process.env.JWT_EXPIRES_IN || '15m' }
   );
 
   return {

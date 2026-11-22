@@ -1,0 +1,34 @@
+$kind: http-request
+url: "{{baseUrl}}/auth/login"
+method: POST
+body:
+  type: json
+  content: "{ \"email\": \"pegawai1@hris.com\",\r
+
+    \"password\": \"pegawai123\"\r
+
+    }"
+scripts:
+  - type: afterResponse
+    code: "const res = pm.response.json();\r
+
+      console.log(\"STATUS:\", pm.response.code, \"| KEYS:\", Object.keys(res));\r
+
+      \r
+
+      const body = res.data || res;\r
+
+      const token = body.access_token || body.token || body.accessToken;\r
+
+      console.log(\"TOKEN DITEMUKAN:\", !!token);\r
+
+      \r
+
+      if (token) {\r
+
+      \  pm.collectionVariables.set(\"access_token\", token);\r
+
+      }"
+    language: text/javascript
+settings: {}
+order: 2000

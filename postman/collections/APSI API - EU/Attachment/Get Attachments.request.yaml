@@ -1,0 +1,10 @@
+$kind: http-request
+url: "{{hostname}}/attachments"
+method: GET
+body:
+  type: formdata
+  content: []
+auth:
+  type: noauth
+settings: {}
+order: 1000

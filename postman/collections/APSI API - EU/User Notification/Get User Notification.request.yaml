@@ -1,0 +1,5 @@
+$kind: http-request
+url: "{{hostname}}/user-notifications/1"
+method: GET
+settings: {}
+order: 1000
