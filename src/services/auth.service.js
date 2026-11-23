@@ -16,15 +16,13 @@ async function login(email, password) {
 
   // Pesan sengaja sama untuk "email tidak ada" dan "password salah",
   // supaya penyerang tidak bisa mengetahui email mana yang terdaftar.
-  const invalid = new HttpError(401, 'Email atau password salah');
+  const invalid = new HttpError(401, 'INVALID_CREDENTIALS', 'Email atau password salah');
 
-  if (!user) throw invalid;
+  if (!user.is_active) throw new HttpError(403, 'ACCOUNT_INACTIVE', 'Akun Anda dinonaktifkan. Hubungi HR.');
 
   const match = await bcrypt.compare(password, user.password_hash);
   if (!match) throw invalid;
-
-  if (!user.is_active) throw new HttpError(403, 'Akun tidak aktif. Hubungi HR.');
-
+  
   // Isi token: id (sub) dan role saja. Tanpa password, tanpa data pribadi.
   const token = jwt.sign(
     { sub: user.id, role: user.role },

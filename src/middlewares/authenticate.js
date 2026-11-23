@@ -1,4 +1,3 @@
-
 const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
 const jwtConfig = require('../config/jwt');
@@ -10,31 +9,32 @@ async function authenticate(req, res, next) {
     const [scheme, token] = authorization.split(' ');
 
     if (scheme !== 'Bearer' || !token) {
-      throw new HttpError(401, 'Token tidak ditemukan');
+      throw new HttpError(401, 'UNAUTHENTICATED', 'Silakan login terlebih dahulu');
     }
 
     let payload;
-
     try {
-      payload = jwt.verify(token, jwtConfig.publicKey, {
-        algorithms: ['RS256'],
-      });
+      payload = jwt.verify(token, jwtConfig.publicKey, { algorithms: ['RS256'] });
     } catch (error) {
-      console.error('JWT verify error:', error.name, '-', error.message);
-      throw new HttpError(401, 'Token tidak valid atau sudah kedaluwarsa');
+      console.error(`[${req.id}] JWT verify error:`, error.name, '-', error.message);
+      // TOKEN_EXPIRED dibedakan, karena app memakainya untuk menukar refresh token
+      if (error.name === 'TokenExpiredError') {
+        throw new HttpError(401, 'TOKEN_EXPIRED', 'Sesi Anda telah berakhir');
+      }
+      throw new HttpError(401, 'UNAUTHENTICATED', 'Token tidak valid');
     }
 
     const result = await pool.query(
-      `SELECT id, name, email, role, is_active
-       FROM users
-       WHERE id = $1`,
+      `SELECT id, name, email, role, is_active FROM users WHERE id = $1`,
       [payload.sub]
     );
-
     const user = result.rows[0];
 
-    if (!user || !user.is_active) {
-      throw new HttpError(401, 'Akun tidak ditemukan atau tidak aktif');
+    if (!user) {
+      throw new HttpError(401, 'UNAUTHENTICATED', 'Akun tidak ditemukan');
+    }
+    if (!user.is_active) {
+      throw new HttpError(403, 'ACCOUNT_INACTIVE', 'Akun Anda dinonaktifkan. Hubungi HR.');
     }
 
     req.user = {

@@ -1,9 +1,7 @@
-// Dipanggil kalau tidak ada route yang cocok
-function notFound(req, res) {
-  res.status(404).json({
-    status: 'error',
-    message: `Route ${req.method} ${req.originalUrl} tidak ditemukan`,
-  });
+const HttpError = require('../utils/httpError');
+
+function notFound(req, res, next) {
+  next(new HttpError(404, 'NOT_FOUND', 'Endpoint tidak ditemukan'));
 }
 
 module.exports = notFound;
