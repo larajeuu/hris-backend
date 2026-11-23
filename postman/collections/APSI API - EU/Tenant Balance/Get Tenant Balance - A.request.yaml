@@ -1,9 +1,0 @@
-$kind: http-request
-url: "{{hostname}}/tenant-balance/8"
-method: GET
-auth:
-  type: bearer
-  credentials:
-    token: "{{supabase_service_role_api_key_0lzi}}"
-settings: {}
-order: 2000

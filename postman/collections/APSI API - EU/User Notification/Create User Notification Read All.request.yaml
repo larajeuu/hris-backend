@@ -1,5 +1,0 @@
-$kind: http-request
-url: "{{hostname}}/user-notifications/1/read-all"
-method: POST
-settings: {}
-order: 3000

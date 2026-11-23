@@ -1,9 +1,0 @@
-$kind: http-request
-url: "{{hostname}}/withdrawals"
-method: GET
-auth:
-  type: bearer
-  credentials:
-    token: "{{supabase_service_role_api_key_1cc9}}"
-settings: {}
-order: 1000
