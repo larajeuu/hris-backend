@@ -4,4 +4,7 @@ node_modules
 !.env.example
 .vercel/
 keys/private.pem
-.postman
+.postman/
+postman/
+keys/
+
