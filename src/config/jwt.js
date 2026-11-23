@@ -1,23 +1,30 @@
+
 const fs = require('fs');
 const path = require('path');
 
-const privateKeyPath = process.env.JWT_PRIVATE_KEY_PATH;
-const publicKeyPath = process.env.JWT_PUBLIC_KEY_PATH;
+function loadKey(envKey, envPath) {
+  if (process.env[envKey]) {
+    return process.env[envKey].replace(/\\n/g, '\n');
+  }
 
-if (!privateKeyPath || !publicKeyPath) {
-  throw new Error(
-    'JWT_PRIVATE_KEY_PATH dan JWT_PUBLIC_KEY_PATH wajib diisi di .env'
-  );
+  if (process.env[envPath]) {
+    return fs.readFileSync(
+      path.resolve(process.cwd(), process.env[envPath]),
+      'utf8'
+    );
+  }
+
+  throw new Error(`${envKey} atau ${envPath} wajib diisi`);
 }
 
-const privateKey = fs.readFileSync(
-  path.resolve(process.cwd(), privateKeyPath),
-  'utf8'
+const privateKey = loadKey(
+  'JWT_PRIVATE_KEY',
+  'JWT_PRIVATE_KEY_PATH'
 );
 
-const publicKey = fs.readFileSync(
-  path.resolve(process.cwd(), publicKeyPath),
-  'utf8'
+const publicKey = loadKey(
+  'JWT_PUBLIC_KEY',
+  'JWT_PUBLIC_KEY_PATH'
 );
 
 module.exports = {
