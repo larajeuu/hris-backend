@@ -36,4 +36,31 @@ async function me(req, res, next) {
   }
 }
 
-module.exports = { login, me };
+async function refresh(req, res, next) {
+  try {
+    const { refresh_token, device_id } = req.body || {};
+
+    const fields = {};
+    if (typeof refresh_token !== 'string' || !refresh_token) fields.refresh_token = ['required'];
+    if (typeof device_id !== 'string' || !device_id.trim()) fields.device_id = ['required'];
+    if (Object.keys(fields).length > 0) {
+      throw new HttpError(422, 'VALIDATION_ERROR', 'refresh_token dan device_id wajib diisi', fields);
+    }
+
+    const data = await authService.refresh(refresh_token, device_id.trim());
+    res.json(data);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function logout(req, res, next) {
+  try {
+    await authService.logout(req.user.id, req.user.device_id);
+    res.status(204).send();
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { login, me, refresh, logout };

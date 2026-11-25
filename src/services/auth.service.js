@@ -93,4 +93,79 @@ async function getMe(userId) {
   };
 }
 
-module.exports = { login, getMe };
+async function refresh(refreshToken, deviceId) {
+  const client = await pool.connect();
+  let outcome;
+  try {
+    await client.query('BEGIN');
+
+    // FOR UPDATE: baris dikunci, supaya dua request bersamaan tidak lolos keduanya
+    const { rows } = await client.query(
+      `SELECT id, user_id, device_id, expires_at, revoked_at
+       FROM refresh_tokens WHERE token_hash = $1 FOR UPDATE`,
+      [tokenService.sha256(refreshToken)]
+    );
+    const row = rows[0];
+
+    if (!row || row.device_id !== deviceId || row.expires_at <= new Date()) {
+      throw new HttpError(401, 'UNAUTHENTICATED', 'Sesi tidak valid. Silakan login kembali.');
+    }
+
+    if (row.revoked_at) {
+      // Token lama dipakai lagi: dicurigai dicuri, cabut semua sesi perangkat ini
+      await client.query(
+        `UPDATE refresh_tokens SET revoked_at = NOW(), updated_at = NOW()
+         WHERE user_id = $1 AND device_id = $2 AND revoked_at IS NULL`,
+        [row.user_id, row.device_id]
+      );
+      await client.query('COMMIT'); // pencabutan harus tersimpan walau kita melempar error
+      outcome = { reused: true };
+    } else {
+      const userResult = await client.query(
+        `SELECT u.id, u.role, u.is_active, u.employee_id,
+                COALESCE(e.is_active, TRUE) AS employee_active
+         FROM users u LEFT JOIN employees e ON e.id = u.employee_id
+         WHERE u.id = $1`,
+        [row.user_id]
+      );
+      const user = userResult.rows[0];
+      if (!user || !user.is_active || !user.employee_active) {
+        throw new HttpError(403, 'ACCOUNT_INACTIVE', 'Akun Anda dinonaktifkan. Hubungi HR.');
+      }
+
+      // Rotasi: terbitkan pasangan baru, token lama dicatat digantikan yang baru
+      const tokens = await tokenService.issueTokens(user, deviceId, client);
+      await client.query('UPDATE refresh_tokens SET replaced_by = $1 WHERE id = $2', [
+        tokens.refresh_token_id,
+        row.id,
+      ]);
+      await client.query('COMMIT');
+      outcome = { tokens };
+    }
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+
+  if (outcome.reused) {
+    throw new HttpError(401, 'UNAUTHENTICATED', 'Sesi tidak valid. Silakan login kembali.');
+  }
+
+  return {
+    access_token: outcome.tokens.access_token,
+    refresh_token: outcome.tokens.refresh_token,
+    expires_in: outcome.tokens.expires_in,
+  };
+}
+
+async function logout(userId, deviceId) {
+  await pool.query(
+    `UPDATE refresh_tokens SET revoked_at = NOW(), updated_at = NOW()
+     WHERE user_id = $1 AND device_id = $2 AND revoked_at IS NULL`,
+    [userId, deviceId]
+  );
+}
+
+module.exports = { login, getMe, refresh, logout };
