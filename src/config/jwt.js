@@ -1,31 +1,15 @@
-
 const fs = require('fs');
 const path = require('path');
 
-function loadKey(envKey, envPath) {
-  if (process.env[envKey]) {
-    return process.env[envKey].replace(/\\n/g, '\n');
-  }
-
-  if (process.env[envPath]) {
-    return fs.readFileSync(
-      path.resolve(process.cwd(), process.env[envPath]),
-      'utf8'
-    );
-  }
-
-  throw new Error(`${envKey} atau ${envPath} wajib diisi`);
+// Prioritas: variabel berisi isi PEM (dipakai di Vercel), lalu file (dipakai di laptop)
+function loadKey(pem, filePath, name) {
+  if (pem) return pem.replace(/\\n/g, '\n');
+  if (filePath) return fs.readFileSync(path.resolve(process.cwd(), filePath), 'utf8');
+  throw new Error(`${name} atau ${name}_PATH wajib diisi`);
 }
 
-const privateKey = loadKey(
-  'JWT_PRIVATE_KEY',
-  'JWT_PRIVATE_KEY_PATH'
-);
-
-const publicKey = loadKey(
-  'JWT_PUBLIC_KEY',
-  'JWT_PUBLIC_KEY_PATH'
-);
+const privateKey = loadKey(process.env.JWT_PRIVATE_KEY, process.env.JWT_PRIVATE_KEY_PATH, 'JWT_PRIVATE_KEY');
+const publicKey = loadKey(process.env.JWT_PUBLIC_KEY, process.env.JWT_PUBLIC_KEY_PATH, 'JWT_PUBLIC_KEY');
 
 module.exports = {
   privateKey,

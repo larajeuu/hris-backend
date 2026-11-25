@@ -8,3 +8,5 @@ keys/private.pem
 postman/
 keys/
 
+.vercel
+.env*
