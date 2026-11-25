@@ -1,5 +1,5 @@
 require('dotenv').config();
-const bcrypt = require('bcryptjs');
+const { hashPassword } = require('../src/utils/password');
 const pool = require('../src/config/db');
 const res = pm.response.json();
 
@@ -10,7 +10,7 @@ async function main() {
   }
 
   // hash = hasil satu arah, tidak bisa dikembalikan jadi password asli
-  const passwordHash = await bcrypt.hash(ADMIN_PASSWORD, 12);
+  const passwordHash = await hashPassword(ADMIN_PASSWORD);
 
   // $1, $2, $3 = parameter terpisah dari teks SQL (mencegah SQL injection)
   // ON CONFLICT DO NOTHING = aman dijalankan berulang, tidak membuat admin ganda

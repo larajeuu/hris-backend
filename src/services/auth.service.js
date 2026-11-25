@@ -1,40 +1,60 @@
 const crypto = require('crypto');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
+const { hashPassword, verifyPassword } = require('../utils/password');
+const tokenService = require('./token.service');
 const pool = require('../config/db');
 const HttpError = require('../utils/httpError');
-const { privateKey } = require('../config/jwt');
 
-async function login(email, password) {
+let dummyHashPromise;
+
+async function getDummyHash() {
+  if (!dummyHashPromise) {
+    dummyHashPromise = hashPassword('testing123');
+  }
+
+  return dummyHashPromise;
+}
+
+async function login(email, password, device) {
   const result = await pool.query(
-    `SELECT id, name, email, password_hash, role, is_active
-     FROM users
-     WHERE LOWER(email) = LOWER($1)`,
+    `SELECT u.id, u.name, u.email, u.password_hash, u.role, u.is_active,
+            u.employee_id, COALESCE(e.is_active, TRUE) AS employee_active
+     FROM users u
+     LEFT JOIN employees e ON e.id = u.employee_id
+     WHERE LOWER(u.email) = LOWER($1)`,
     [email]
   );
   const user = result.rows[0];
 
-  // Pesan sengaja sama untuk "email tidak ada" dan "password salah",
-  // supaya penyerang tidak bisa mengetahui email mana yang terdaftar.
+  // Pesan sengaja sama untuk "email tidak ada" dan "password salah"
   const invalid = new HttpError(401, 'INVALID_CREDENTIALS', 'Email atau password salah');
 
-  if (!user.is_active) throw new HttpError(403, 'ACCOUNT_INACTIVE', 'Akun Anda dinonaktifkan. Hubungi HR.');
+  if (!user) {
+    await verifyPassword(password, await getDummyHash()); // waktu respons tetap mirip
+    throw invalid;
+  }
 
-  const match = await bcrypt.compare(password, user.password_hash);
-  if (!match) throw invalid;
-  
-  // Isi token: id (sub) dan role saja. Tanpa password, tanpa data pribadi.
-  const token = jwt.sign(
-    { sub: user.id, role: user.role },
-    privateKey,
-    { algorithm: 'RS256', expiresIn: process.env.JWT_EXPIRES_IN || '15m' }
-  );
+  if (!(await verifyPassword(password, user.password_hash))) throw invalid;
+
+  if (!user.is_active || !user.employee_active) {
+    throw new HttpError(403, 'ACCOUNT_INACTIVE', 'Akun Anda dinonaktifkan. Hubungi HR.');
+  }
+
+  const tokens = await tokenService.issueTokens(user, device.id);
 
   return {
-    token,
-    user: { id: user.id, name: user.name, email: user.email, role: user.role },
+    access_token: tokens.access_token,
+    refresh_token: tokens.refresh_token,
+    expires_in: tokens.expires_in,
+    user: {
+      id: user.id,
+      employee_id: user.employee_id,
+      name: user.name,
+      roles: tokens.roles,
+      biometric_enabled: false, // diaktifkan saat fitur biometrik dibuat
+    },
   };
 }
+
 async function getMe(userId) {
   const result = await pool.query(
     `SELECT u.id, u.name, u.email, u.role, u.employee_code, u.job_title,

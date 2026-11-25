@@ -1,6 +1,6 @@
 require('dotenv').config();
-const bcrypt = require('bcryptjs');
 const pool = require('../src/config/db');
+const { hashPassword } = require('../src/utils/password');
 
 async function main() {
   const email = process.argv[2];
@@ -10,7 +10,7 @@ async function main() {
     throw new Error('Pakai: set NEW_PASSWORD (min 12 karakter), lalu node scripts/reset-password.js <email>');
   }
 
-  const hash = await bcrypt.hash(newPassword, 12);
+  const hash = await hashPassword(newPassword);
   const result = await pool.query(
     'UPDATE users SET password_hash = $1, updated_at = NOW() WHERE LOWER(email) = LOWER($2) RETURNING email',
     [hash, email]
