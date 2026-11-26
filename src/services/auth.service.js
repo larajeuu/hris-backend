@@ -5,6 +5,7 @@ const pool = require('../config/db');
 const HttpError = require('../utils/httpError');
 const PASSWORD_MIN_LENGTH = 8;
 const PASSWORD_MAX_LENGTH = 128;
+const mailService = require('./mail.service');
 
 let dummyHashPromise;
 
@@ -232,4 +233,118 @@ async function changePassword(userId, deviceId, currentPassword, newPassword) {
   }
 }
 
-module.exports = { login, refresh, logout, changePassword, getMe };
+const RESET_TOKEN_TTL_MINUTES = 30;
+const RESET_THROTTLE_SECONDS = 60;
+
+async function requestPasswordReset(email) {
+  const { rows } = await pool.query(
+    `SELECT u.id, u.email
+     FROM users u
+     LEFT JOIN employees e ON e.id = u.employee_id
+     WHERE LOWER(u.email) = LOWER($1) AND u.is_active AND COALESCE(e.is_active, TRUE)`,
+    [email]
+  );
+  const user = rows[0];
+  if (!user) return; // diam-diam: respons tetap sama supaya email tidak bisa ditebak
+
+  // Satu permintaan per 60 detik per akun, mencegah spam email
+  const recent = await pool.query(
+    `SELECT 1 FROM password_resets
+     WHERE user_id = $1 AND created_at > NOW() - make_interval(secs => $2::int)`,
+    [user.id, RESET_THROTTLE_SECONDS]
+  );
+  if (recent.rowCount > 0) return;
+
+  const token = crypto.randomBytes(32).toString('base64url');
+
+  // Tautan lama dimatikan, hanya yang terbaru yang berlaku
+  await pool.query(
+    `UPDATE password_resets SET used_at = NOW(), updated_at = NOW()
+     WHERE user_id = $1 AND used_at IS NULL`,
+    [user.id]
+  );
+  await pool.query(
+    `INSERT INTO password_resets (user_id, token_hash, expires_at)
+     VALUES ($1, $2, NOW() + make_interval(mins => $3::int))`,
+    [user.id, tokenService.sha256(token), RESET_TOKEN_TTL_MINUTES]
+  );
+
+  const base = process.env.PASSWORD_RESET_URL || 'hris://reset-password';
+  try {
+    await mailService.sendPasswordResetEmail(user.email, `${base}?token=${token}`);
+  } catch (err) {
+    // Gagal kirim tidak boleh mengubah respons (kalau tidak, email terdaftar jadi ketahuan)
+    console.error('[MAIL] gagal mengirim:', err.message);
+  }
+}
+
+async function resetPassword(token, newPassword) {
+  if (newPassword.length < PASSWORD_MIN_LENGTH || newPassword.length > PASSWORD_MAX_LENGTH) {
+    throw new HttpError(
+      422,
+      'WEAK_PASSWORD',
+      `Password baru harus ${PASSWORD_MIN_LENGTH} sampai ${PASSWORD_MAX_LENGTH} karakter`
+    );
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { rows } = await client.query(
+      `SELECT r.id, r.user_id, r.expires_at, r.used_at, u.password_hash
+       FROM password_resets r
+       JOIN users u ON u.id = r.user_id
+       WHERE r.token_hash = $1
+       FOR UPDATE OF r`,
+      [tokenService.sha256(token)]
+    );
+    const row = rows[0];
+    if (!row || row.used_at || row.expires_at <= new Date()) {
+      throw new HttpError(422, 'INVALID_RESET_TOKEN', 'Tautan reset tidak valid atau sudah kedaluwarsa');
+    }
+
+    // Tidak boleh sama dengan 3 password terakhir (saat ini + 2 sebelumnya)
+    const previous = await client.query(
+      'SELECT password_hash FROM password_history WHERE user_id = $1 ORDER BY created_at DESC LIMIT 2',
+      [row.user_id]
+    );
+    const lastThree = [row.password_hash, ...previous.rows.map((r) => r.password_hash)];
+    for (const oldHash of lastThree) {
+      if (await verifyPassword(newPassword, oldHash)) {
+        throw new HttpError(422, 'WEAK_PASSWORD', 'Password baru tidak boleh sama dengan 3 password terakhir');
+      }
+    }
+
+    const newHash = await hashPassword(newPassword);
+
+    await client.query(
+      'INSERT INTO password_history (user_id, password_hash) VALUES ($1, $2)',
+      [row.user_id, row.password_hash]
+    );
+    await client.query(
+      `UPDATE users SET password_hash = $1, must_change_password = FALSE, updated_at = NOW()
+       WHERE id = $2`,
+      [newHash, row.user_id]
+    );
+    await client.query(
+      'UPDATE password_resets SET used_at = NOW(), updated_at = NOW() WHERE id = $1',
+      [row.id]
+    );
+    // Reset berarti akun mungkin bermasalah: semua sesi perangkat dicabut
+    await client.query(
+      `UPDATE refresh_tokens SET revoked_at = NOW(), updated_at = NOW()
+       WHERE user_id = $1 AND revoked_at IS NULL`,
+      [row.user_id]
+    );
+
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+module.exports = { login, refresh, logout, changePassword, requestPasswordReset, resetPassword, getMe };

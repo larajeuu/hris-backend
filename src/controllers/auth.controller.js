@@ -81,4 +81,37 @@ async function changePassword(req, res, next) {
   }
 }
 
-module.exports = { login, me, refresh, logout, changePassword };
+async function forgotPassword(req, res, next) {
+  try {
+    const { email } = req.body || {};
+    if (typeof email !== 'string' || !email.trim()) {
+      throw new HttpError(422, 'VALIDATION_ERROR', 'Email wajib diisi', { email: ['required'] });
+    }
+
+    await authService.requestPasswordReset(email.trim());
+    // Selalu 202, apa pun hasilnya, sesuai kontrak
+    res.status(202).json({ message: 'Jika email terdaftar, tautan reset telah dikirim' });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function resetPassword(req, res, next) {
+  try {
+    const { token, new_password } = req.body || {};
+
+    const fields = {};
+    if (typeof token !== 'string' || !token) fields.token = ['required'];
+    if (typeof new_password !== 'string' || !new_password) fields.new_password = ['required'];
+    if (Object.keys(fields).length > 0) {
+      throw new HttpError(422, 'VALIDATION_ERROR', 'Token dan password baru wajib diisi', fields);
+    }
+
+    await authService.resetPassword(token, new_password);
+    res.status(204).send();
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { login, me, refresh, logout, changePassword, forgotPassword, resetPassword };
