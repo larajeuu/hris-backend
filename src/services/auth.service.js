@@ -3,6 +3,8 @@ const { hashPassword, verifyPassword } = require('../utils/password');
 const tokenService = require('./token.service');
 const pool = require('../config/db');
 const HttpError = require('../utils/httpError');
+const PASSWORD_MIN_LENGTH = 8;
+const PASSWORD_MAX_LENGTH = 128;
 
 let dummyHashPromise;
 
@@ -168,4 +170,66 @@ async function logout(userId, deviceId) {
   );
 }
 
-module.exports = { login, getMe, refresh, logout };
+async function changePassword(userId, deviceId, currentPassword, newPassword) {
+  const { rows } = await pool.query(
+    'SELECT id, password_hash FROM users WHERE id = $1',
+    [userId]
+  );
+  const user = rows[0];
+  if (!user) throw new HttpError(404, 'NOT_FOUND', 'Pengguna tidak ditemukan');
+
+  if (!(await verifyPassword(currentPassword, user.password_hash))) {
+    throw new HttpError(422, 'WRONG_PASSWORD', 'Password saat ini salah');
+  }
+
+  if (newPassword.length < PASSWORD_MIN_LENGTH || newPassword.length > PASSWORD_MAX_LENGTH) {
+    throw new HttpError(
+      422,
+      'WEAK_PASSWORD',
+      `Password baru harus ${PASSWORD_MIN_LENGTH} sampai ${PASSWORD_MAX_LENGTH} karakter`
+    );
+  }
+
+  // 3 password terakhir = password saat ini + 2 password sebelumnya
+  const previous = await pool.query(
+    'SELECT password_hash FROM password_history WHERE user_id = $1 ORDER BY created_at DESC LIMIT 2',
+    [userId]
+  );
+  const lastThree = [user.password_hash, ...previous.rows.map((r) => r.password_hash)];
+  for (const oldHash of lastThree) {
+    if (await verifyPassword(newPassword, oldHash)) {
+      throw new HttpError(422, 'WEAK_PASSWORD', 'Password baru tidak boleh sama dengan 3 password terakhir');
+    }
+  }
+
+  const newHash = await hashPassword(newPassword);
+
+  // Satu transaksi: ganti password, simpan riwayat, cabut sesi perangkat lain
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(
+      'INSERT INTO password_history (user_id, password_hash) VALUES ($1, $2)',
+      [userId, user.password_hash]
+    );
+    await client.query(
+      `UPDATE users
+       SET password_hash = $1, must_change_password = FALSE, updated_at = NOW()
+       WHERE id = $2`,
+      [newHash, userId]
+    );
+    await client.query(
+      `UPDATE refresh_tokens SET revoked_at = NOW(), updated_at = NOW()
+       WHERE user_id = $1 AND device_id <> $2 AND revoked_at IS NULL`,
+      [userId, deviceId]
+    );
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+module.exports = { login, refresh, logout, changePassword, getMe };

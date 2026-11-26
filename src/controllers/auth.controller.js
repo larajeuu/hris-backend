@@ -63,4 +63,22 @@ async function logout(req, res, next) {
   }
 }
 
-module.exports = { login, me, refresh, logout };
+async function changePassword(req, res, next) {
+  try {
+    const { current_password, new_password } = req.body || {};
+
+    const fields = {};
+    if (typeof current_password !== 'string' || !current_password) fields.current_password = ['required'];
+    if (typeof new_password !== 'string' || !new_password) fields.new_password = ['required'];
+    if (Object.keys(fields).length > 0) {
+      throw new HttpError(422, 'VALIDATION_ERROR', 'Password saat ini dan password baru wajib diisi', fields);
+    }
+
+    await authService.changePassword(req.user.id, req.user.device_id, current_password, new_password);
+    res.status(204).send();
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { login, me, refresh, logout, changePassword };
