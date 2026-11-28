@@ -82,6 +82,8 @@ async function changePassword(req, res, next) {
 }
 
 async function forgotPassword(req, res, next) {
+  console.log('[CONTROLLER] forgotPassword terpanggil');
+
   try {
     const { email } = req.body || {};
     if (typeof email !== 'string' || !email.trim()) {

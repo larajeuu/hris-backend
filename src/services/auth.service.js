@@ -237,6 +237,7 @@ const RESET_TOKEN_TTL_MINUTES = 30;
 const RESET_THROTTLE_SECONDS = 60;
 
 async function requestPasswordReset(email) {
+  console.log('[RESET] Request diterima untuk: ', email);
   const { rows } = await pool.query(
     `SELECT u.id, u.email
      FROM users u
@@ -271,12 +272,15 @@ async function requestPasswordReset(email) {
 
   const base = process.env.PASSWORD_RESET_URL || 'hris://reset-password';
   try {
+    console.log('[RESET] Memanggil mail service');
     await mailService.sendPasswordResetEmail(user.email, `${base}?token=${token}`);
   } catch (err) {
     // Gagal kirim tidak boleh mengubah respons (kalau tidak, email terdaftar jadi ketahuan)
     console.error('[MAIL] gagal mengirim:', err.message);
   }
 }
+
+
 
 async function resetPassword(token, newPassword) {
   if (newPassword.length < PASSWORD_MIN_LENGTH || newPassword.length > PASSWORD_MAX_LENGTH) {
