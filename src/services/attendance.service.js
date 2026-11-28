@@ -90,4 +90,192 @@ async function getToday(employeeId) {
   };
 }
 
-module.exports = { getToday };
+
+async function clockIn(employeeId, payload) {
+  if (!employeeId) {
+    throw new HttpError(403, 'FORBIDDEN', 'Akun ini tidak memiliki data absensi');
+  }
+
+  const { lat, lng, accuracy_m, is_mock } = payload;
+
+  // Validasi input
+  if (
+    typeof lat !== 'number' ||
+    typeof lng !== 'number' ||
+    typeof accuracy_m !== 'number' ||
+    !Number.isFinite(lat) ||
+    !Number.isFinite(lng) ||
+    !Number.isFinite(accuracy_m) ||
+    lat < -90 || lat > 90 ||
+    lng < -180 || lng > 180 ||
+    accuracy_m < 0
+  ) {
+    throw new HttpError(422, 'VALIDATION_ERROR', 'Koordinat atau akurasi GPS tidak valid');
+  }
+
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    // Ambil jadwal hari ini dan kunci record jadwal
+    const scheduleResult = await client.query(
+      `SELECT
+          ws.work_date,
+          s.id AS shift_id,
+          s.start_time,
+          s.late_tolerance_min,
+          s.is_overnight
+       FROM work_schedules ws
+       JOIN shifts s ON s.id = ws.shift_id
+       WHERE ws.employee_id = $1
+         AND ws.work_date = (NOW() AT TIME ZONE 'Asia/Jakarta')::date
+       FOR UPDATE OF ws`,
+      [employeeId]
+    );
+
+    const schedule = scheduleResult.rows[0];
+
+    if (!schedule) {
+      throw new HttpError(422, 'NO_WORK_SCHEDULE', 'Tidak ada jadwal kerja hari ini');
+    }
+
+    // Ambil kantor
+    const officeResult = await client.query(
+      `SELECT
+          o.id,
+          o.latitude,
+          o.longitude,
+          o.radius_meters
+       FROM employees e
+       JOIN offices o ON o.id = e.office_id
+       WHERE e.id = $1`,
+      [employeeId]
+    );
+
+    const office = officeResult.rows[0];
+
+    if (!office) {
+      throw new HttpError(422, 'OFFICE_NOT_FOUND', 'Kantor karyawan tidak ditemukan');
+    }
+
+    // Ambil aturan absensi
+    const rulesResult = await client.query(
+      `SELECT value FROM settings WHERE key = 'attendance'`
+    );
+
+    const rules = rulesResult.rows[0]?.value || {
+      max_accuracy_m: 30,
+      selfie_required: false,
+      reject_mock: false,
+    };
+
+    if (accuracy_m > Number(rules.max_accuracy_m)) {
+      throw new HttpError(422, 'GPS_ACCURACY_TOO_LOW', 'Akurasi GPS tidak memenuhi ketentuan');
+    }
+
+    if (rules.reject_mock && is_mock === true) {
+      throw new HttpError(422, 'MOCK_LOCATION_REJECTED', 'Lokasi palsu tidak diperbolehkan');
+    }
+
+    // Hitung jarak koordinat perangkat dengan kantor (Haversine)
+    const toRad = (value) => value * Math.PI / 180;
+    const earthRadius = 6371000;
+
+    const dLat = toRad(Number(office.latitude) - lat);
+    const dLng = toRad(Number(office.longitude) - lng);
+
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(lat)) *
+      Math.cos(toRad(Number(office.latitude))) *
+      Math.sin(dLng / 2) ** 2;
+
+    const distance = earthRadius * 2 * Math.atan2(
+      Math.sqrt(a),
+      Math.sqrt(1 - a)
+    );
+
+    if (distance > Number(office.radius_meters)) {
+      throw new HttpError(422, 'OUTSIDE_OFFICE_RADIUS', 'Kamu berada di luar radius kantor');
+    }
+
+    // Hitung keterlambatan berdasarkan waktu server Asia/Jakarta
+    const timeResult = await client.query(
+        `SELECT
+            GREATEST (
+                0,
+                FLOOR(
+                    EXTRACT(
+                        EPOCH FROM (
+                            (NOW() AT TIME ZONE 'Asia/Jakarta')::time
+                            -
+                            ($1::time + make_interval(mins => $2))
+                        )
+                    ) / 60
+                )
+            )::int AS late_minutes`,
+      [schedule.start_time, schedule.late_tolerance_min]
+    );
+
+    const lateMinutes = timeResult.rows[0].late_minutes;
+    const status = lateMinutes > 0 ? 'late' : 'present';
+
+    // Satu record per karyawan per tanggal.
+    // Constraint UNIQUE juga melindungi dari request bersamaan.
+    const insertResult = await client.query(
+      `INSERT INTO attendances (
+          employee_id,
+          office_id,
+          shift_id,
+          work_date,
+          clock_in,
+          in_lat,
+          in_lng,
+          in_accuracy_m,
+          in_distance_m,
+          status,
+          late_minutes
+       )
+       VALUES (
+          $1, $2, $3,
+          (NOW() AT TIME ZONE 'Asia/Jakarta')::date,
+          NOW(), $4, $5, $6, $7, $8, $9
+       )
+       RETURNING
+          id,
+          to_char(clock_in AT TIME ZONE 'Asia/Jakarta',
+            'YYYY-MM-DD"T"HH24:MI:SS"+07:00"') AS clock_in,
+          status,
+          late_minutes`,
+      [
+        employeeId,
+        office.id,
+        schedule.shift_id,
+        lat,
+        lng,
+        accuracy_m,
+        distance,
+        status,
+        lateMinutes,
+      ]
+    );
+
+    await client.query('COMMIT');
+
+    return insertResult.rows[0];
+  } catch (err) {
+    await client.query('ROLLBACK');
+
+    if (err.code === '23505') {
+      throw new HttpError(409, 'ALREADY_CLOCKED_IN', 'Kamu sudah melakukan clock-in hari ini');
+    }
+
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+
+module.exports = { getToday, clockIn };
